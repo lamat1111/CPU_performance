@@ -71,16 +71,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Ensure cpupower is installed
+# Ensure cpupower and bc are installed
 if ! command -v cpupower &> /dev/null; then
     echo "cpupower not found, installing..."
-    apt install -y linux-tools-common linux-tools-generic
+    apt update && apt install -y linux-tools-common linux-tools-generic
 fi
 
-# Ensure bc is installed
 if ! command -v bc &> /dev/null; then
     echo "bc not found, installing..."
-    apt install -y bc
+    apt update && apt install -y bc
 fi
 
 # Set CPU governor to performance mode
@@ -136,7 +135,7 @@ lscpu | egrep "Model name|^CPU\(s\)|Thread\(s\) per core|Core\(s\) per socket|So
 # Calculate average frequency
 if [ -d /sys/devices/system/cpu/cpu0/cpufreq ]; then
     avg_freq=$(awk '{sum+=$1} END {printf "%.2f", sum/NR/1000}' /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq 2>/dev/null)
-    avg_freq_ghz=$(echo "scale=2; $avg_freq / 1000" | bc)
+    avg_freq_ghz=$(/usr/bin/bc <<< "scale=2; $avg_freq / 1000")
 else
     avg_freq_ghz="N/A"
 fi
@@ -166,10 +165,10 @@ printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "Architecture:" "$(grep "Architectur
 printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "Uptime:" "$(grep "Uptime" "$CPU_INFO_FILE" | cut -d':' -f2- | xargs)"
 
 print_header "2. CPU Specifications"
-printf "${BLUE}%-28s${NC}${WHITE}%.2f GHz${NC}\n" "Minimum Clock Speed:" "$(echo "scale=2; $(grep "CPU min MHz" "$CPU_INFO_FILE" | awk '{print $4}')/1000" | bc)"
-printf "${BLUE}%-28s${NC}${WHITE}%.2f GHz${NC}\n" "Maximum Clock Speed:" "$(echo "scale=2; $(grep "CPU max MHz" "$CPU_INFO_FILE" | awk '{print $4}')/1000" | bc)"
-printf "${BLUE}%-28s${NC}${GREEN}%.2f GHz${NC}\n" "Average CPU Frequency:" "$(grep "Average CPU Frequency" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-printf "${BLUE}%-28s${NC}${WHITE}%.2f%%${NC}\n" "Current CPU Utilization:" "$(grep "cpu_util" "$CPU_INFO_FILE" | cut -d' ' -f2)"
+printf "${BLUE}%-28s${NC}${WHITE}%.2f GHz${NC}\n" "Minimum Clock Speed:" "$(/usr/bin/bc <<< "scale=2; $(grep "CPU min MHz" "$CPU_INFO_FILE" | awk '{print $4}')/1000")"
+printf "${BLUE}%-28s${NC}${WHITE}%.2f GHz${NC}\n" "Maximum Clock Speed:" "$(/usr/bin/bc <<< "scale=2; $(grep "CPU max MHz" "$CPU_INFO_FILE" | awk '{print $4}')/1000")"
+printf "${BLUE}%-28s${NC}${GREEN}%.2f GHz${NC}\n" "Average CPU Frequency:" "$avg_freq_ghz"
+printf "${BLUE}%-28s${NC}${WHITE}%.2f%%${NC}\n" "Current CPU Utilization:" "$cpu_util"
 
 print_header "3. Cache Information"
 printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Data Cache:" "$(grep "L1d cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
