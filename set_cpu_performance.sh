@@ -74,7 +74,13 @@ trap cleanup EXIT
 # Ensure cpupower is installed
 if ! command -v cpupower &> /dev/null; then
     echo "cpupower not found, installing..."
-    apt-get install -y linux-tools-common linux-tools-generic
+    apt install -y linux-tools-common linux-tools-generic
+fi
+
+# Ensure bc is installed
+if ! command -v bc &> /dev/null; then
+    echo "bc not found, installing..."
+    apt install -y bc
 fi
 
 # Set CPU governor to performance mode
@@ -128,9 +134,13 @@ cpupower frequency-info >> "$CPU_INFO_FILE"
 lscpu | egrep "Model name|^CPU\(s\)|Thread\(s\) per core|Core\(s\) per socket|Socket\(s\)|NUMA node\(s\)|CPU MHz|CPU max MHz|CPU min MHz|L1d cache|L1i cache|L2 cache|L3 cache|CPU family|Model|Architecture|CPU op-mode|Virtualization:" >> "$CPU_INFO_FILE"
 
 # Calculate average frequency
-avg_freq=$(awk '{sum+=$1} END {printf "%.2f", sum/NR/1000}' /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq)
-avg_freq_ghz=$(echo "scale=2; $avg_freq / 1000" | bc)
-echo "Average CPU Frequency: $avg_freq_ghz GHz" >> "$CPU_INFO_FILE"
+if [ -d /sys/devices/system/cpu/cpu0/cpufreq ]; then
+    avg_freq=$(awk '{sum+=$1} END {printf "%.2f", sum/NR/1000}' /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq 2>/dev/null)
+    avg_freq_ghz=$(echo "scale=2; $avg_freq / 1000" | bc)
+else
+    avg_freq_ghz="N/A"
+fi
+echo "Average CPU Frequency: $avg_freq_ghz" >> "$CPU_INFO_FILE"
 log_message "Average CPU frequency: $avg_freq_ghz GHz"
 
 # Get CPU utilization
@@ -164,4 +174,3 @@ printf "${BLUE}%-28s${NC}${WHITE}%.2f%%${NC}\n" "Current CPU Utilization:" "$(gr
 print_header "3. Cache Information"
 printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Data Cache:" "$(grep "L1d cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
 printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Instruction Cache:" "$(grep "L1i cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-
