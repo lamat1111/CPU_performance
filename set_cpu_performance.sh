@@ -71,12 +71,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Set CPU governor to performance and count cores
+# Ensure cpupower is installed
+if ! command -v cpupower &> /dev/null; then
+    echo "cpupower not found, installing..."
+    apt-get install -y linux-tools-common linux-tools-generic
+fi
+
+# Set CPU governor to performance mode
 printf "${BLUE}Setting all cores to performance mode...${NC}\n"
 log_message "Setting all cores to performance mode"
-for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
-    echo performance > "$cpu/cpufreq/scaling_governor" 2>/dev/null
-done
+cpupower frequency-set -g performance
 
 # Initialize variables to store core counts
 performance_cores=0
@@ -87,14 +91,16 @@ schedutil_cores=0
 
 # Count cores in each mode
 for gov_file in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do
-    mode=$(cat $gov_file)
-    case "$mode" in
-        "performance") ((performance_cores++)) ;;
-        "powersave") ((powersave_cores++)) ;;
-        "ondemand") ((ondemand_cores++)) ;;
-        "conservative") ((conservative_cores++)) ;;
-        "schedutil") ((schedutil_cores++)) ;;
-    esac
+    if [ -f "$gov_file" ]; then
+        mode=$(cat $gov_file)
+        case "$mode" in
+            "performance") ((performance_cores++)) ;;
+            "powersave") ((powersave_cores++)) ;;
+            "ondemand") ((ondemand_cores++)) ;;
+            "conservative") ((conservative_cores++)) ;;
+            "schedutil") ((schedutil_cores++)) ;;
+        esac
+    fi
 done
 
 # Write core counts to the governor file
@@ -107,8 +113,8 @@ printf "schedutil %d\n" $schedutil_cores >> "$GOVERNOR_FILE"
 log_message "Core counts - Performance: $performance_cores, Powersave: $powersave_cores, Ondemand: $ondemand_cores, Conservative: $conservative_cores, Schedutil: $schedutil_cores"
 
 # Enable AMD boost if available
-if [ -f "/sys/devices/system/cpu/cpufreq/boost" ]; then
-    echo 1 > /sys/devices/system/cpu/cpufreq/boost
+if [ -f "/sys/devices/system/cpu/cpufreq/amd_pstate/boost" ]; then
+    echo 1 > /sys/devices/system/cpu/cpufreq/amd_pstate/boost
     echo "boost Enabled" >> "$CPU_INFO_FILE"
     log_message "AMD boost enabled"
 else
@@ -148,7 +154,6 @@ printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "Architecture:" "$(grep "Architectur
 printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "Uptime:" "$(grep "Uptime" "$CPU_INFO_FILE" | cut -d':' -f2- | xargs)"
 
 print_header "2. CPU Specifications"
-printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "CPU Family:" "$(grep "CPU family" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
 printf "${BLUE}%-28s${NC}${WHITE}%.2f GHz${NC}\n" "Minimum Clock Speed:" "$(echo "scale=2; $(grep "CPU min MHz" "$CPU_INFO_FILE" | awk '{print $4}')/1000" | bc)"
 printf "${BLUE}%-28s${NC}${WHITE}%.2f GHz${NC}\n" "Maximum Clock Speed:" "$(echo "scale=2; $(grep "CPU max MHz" "$CPU_INFO_FILE" | awk '{print $4}')/1000" | bc)"
 printf "${BLUE}%-28s${NC}${GREEN}%.2f GHz${NC}\n" "Average CPU Frequency:" "$(grep "Average CPU Frequency" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
@@ -156,54 +161,4 @@ printf "${BLUE}%-28s${NC}${WHITE}%.2f%%${NC}\n" "Current CPU Utilization:" "$(gr
 
 print_header "3. Cache Information"
 printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Data Cache:" "$(grep "L1d cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Instruction Cache:" "$(grep "L1i cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L2 Cache:" "$(grep "L2 cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L3 Cache:" "$(grep "L3 cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-
-print_header "4. Advanced CPU Details"
-printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "Thread(s) per Core:" "$(grep "Thread(s) per core" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "Core(s) per Socket:" "$(grep "Core(s) per socket" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "Socket(s):" "$(grep "Socket(s)" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "NUMA Node(s):" "$(grep "NUMA node(s)" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "Virtualization:" "$(grep "Virtualization" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-
-print_header "5. Performance Status"
-while read -r mode count; do
-    if [[ $count -gt 0 ]]; then
-        case "$mode" in
-            "performance") printf "${BLUE}%-28s${NC}${GREEN}%s${NC}\n" "Cores in $mode mode:" "$count" ;;
-            "powersave") printf "${BLUE}%-28s${NC}${RED}%s${NC}\n" "Cores in $mode mode:" "$count" ;;
-            *) printf "${BLUE}%-28s${NC}${YELLOW}%s${NC}\n" "Cores in $mode mode:" "$count" ;;
-        esac
-    fi
-done < "$GOVERNOR_FILE"
-
-boost_status=$(grep "boost" "$CPU_INFO_FILE" | awk '{print $2}')
-if [[ "$boost_status" == "Enabled" ]]; then
-    printf "${BLUE}%-28s${NC}${GREEN}%s${NC}\n" "CPU Boost:" "$boost_status"
-else
-    printf "${BLUE}%-28s${NC}${RED}%s${NC}\n" "CPU Boost:" "$boost_status"
-fi
-
-printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "Memory Usage:" "$(cat "$MEMORY_INFO_FILE")"
-
-# Performance status messages
-printf "\n${YELLOW}%s${NC}\n" "$(printf '=%.0s' {1..60})"
-
-# Verification
-performance_cores=$(grep "performance" "$GOVERNOR_FILE" | awk '{print $2}')
-total_cores=$(grep "CPU(s)" "$CPU_INFO_FILE" | awk '{print $2}')
-boost_status=$(grep "boost" "$CPU_INFO_FILE" | awk '{print $2}')
-
-if [ "$performance_cores" -eq "$total_cores" ] && [ "$boost_status" = "Enabled" ]; then
-    printf "${GREEN}✅ All cores are set to performance mode and CPU boost is enabled.${NC}\n"
-    printf "${GREEN}   Your server is configured for maximum CPU performance.${NC}\n"
-    log_message "All cores are set to performance mode and CPU boost is enabled"
-else
-    printf "${RED}⚠️  Your server may not be configured for maximum CPU performance.${NC}\n"
-    printf "${RED}   Please check the summary above for details.${NC}\n"
-    log_message "WARNING: Not all cores are in performance mode or CPU boost is not enabled"
-fi
-printf "${YELLOW}%s${NC}\n" "$(printf '=%.0s' {1..60})"
-
-log_message "Script completed"
+printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Instruction Cache:" "$(grep "L1i cache" "$CPU_INFO_FILE" | cut -d':' -
