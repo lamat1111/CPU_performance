@@ -112,15 +112,17 @@ printf "schedutil %d\n" $schedutil_cores >> "$GOVERNOR_FILE"
 
 log_message "Core counts - Performance: $performance_cores, Powersave: $powersave_cores, Ondemand: $ondemand_cores, Conservative: $conservative_cores, Schedutil: $schedutil_cores"
 
-# Enable AMD boost if available
-if [ -f "/sys/devices/system/cpu/cpufreq/amd_pstate/boost" ]; then
-    echo 1 > /sys/devices/system/cpu/cpufreq/amd_pstate/boost
-    echo "boost Enabled" >> "$CPU_INFO_FILE"
-    log_message "AMD boost enabled"
+# Check boost status
+if cpupower frequency-info | grep -q "boost state support:.*Active: yes"; then
+    echo "Boost is already active" >> "$CPU_INFO_FILE"
+    log_message "AMD boost is active"
 else
-    echo "boost Not available" >> "$CPU_INFO_FILE"
-    log_message "AMD boost not available"
+    echo "Boost is not active or not supported" >> "$CPU_INFO_FILE"
+    log_message "AMD boost is not active or not supported"
 fi
+
+# Get detailed CPU information
+cpupower frequency-info >> "$CPU_INFO_FILE"
 
 # Get CPU information
 lscpu | egrep "Model name|^CPU\(s\)|Thread\(s\) per core|Core\(s\) per socket|Socket\(s\)|NUMA node\(s\)|CPU MHz|CPU max MHz|CPU min MHz|L1d cache|L1i cache|L2 cache|L3 cache|CPU family|Model|Architecture|CPU op-mode|Virtualization:" >> "$CPU_INFO_FILE"
@@ -128,7 +130,7 @@ lscpu | egrep "Model name|^CPU\(s\)|Thread\(s\) per core|Core\(s\) per socket|So
 # Calculate average frequency
 avg_freq=$(awk '{sum+=$1} END {printf "%.2f", sum/NR/1000}' /sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq)
 avg_freq_ghz=$(echo "scale=2; $avg_freq / 1000" | bc)
-echo "Average CPU Frequency: $avg_freq_ghz" >> "$CPU_INFO_FILE"
+echo "Average CPU Frequency: $avg_freq_ghz GHz" >> "$CPU_INFO_FILE"
 log_message "Average CPU frequency: $avg_freq_ghz GHz"
 
 # Get CPU utilization
