@@ -85,7 +85,7 @@ fi
 # Set CPU governor to performance mode
 printf "${BLUE}Setting all cores to performance mode...${NC}\n"
 log_message "Setting all cores to performance mode"
-cpupower frequency-set -g performance
+cpupower frequency-set -g performance > /dev/null 2>&1
 
 # Initialize variables to store core counts
 performance_cores=0
@@ -119,10 +119,18 @@ log_message "Core counts - Performance: $performance_cores, Powersave: $powersav
 
 # Check boost status
 boost_status=$(cpupower frequency-info | grep -E 'boost state support:|Supported:|Active:')
-echo "$boost_status" >> "$CPU_INFO_FILE"
+
+# Clean up boost status output
+boost_state_support=$(echo "$boost_status" | grep 'boost state support:' | awk -F':' '{print $2}' | xargs)
+boost_supported=$(echo "$boost_status" | grep 'Supported:' | awk -F':' '{print $2}' | xargs | awk '{print $1}')
+boost_active=$(echo "$boost_status" | grep 'Active:' | awk -F':' '{print $2}' | xargs | awk '{print $1}')
+
+# Write cleaned boost status to CPU_INFO_FILE
+echo "Boost Supported: $boost_supported" >> "$CPU_INFO_FILE"
+echo "Boost Active: $boost_active" >> "$CPU_INFO_FILE"
 
 # Log boost status
-if echo "$boost_status" | grep -q "Active: yes"; then
+if [ "$boost_active" = "yes" ]; then
     log_message "AMD boost is active"
 else
     log_message "AMD boost is not active or not supported"
@@ -170,11 +178,9 @@ print_header "2. CPU Specifications"
 printf "${BLUE}%-28s${NC}${WHITE}%.2f GHz${NC}\n" "Minimum Clock Speed:" "$(/usr/bin/bc <<< "scale=2; $(grep "CPU min MHz" "$CPU_INFO_FILE" | awk '{print $4}')/1000")"
 printf "${BLUE}%-28s${NC}${WHITE}%.2f GHz${NC}\n" "Maximum Clock Speed:" "$(/usr/bin/bc <<< "scale=2; $(grep "CPU max MHz" "$CPU_INFO_FILE" | awk '{print $4}')/1000")"
 printf "${BLUE}%-28s${NC}${GREEN}%.2f GHz${NC}\n" "Average CPU Frequency:" "$avg_freq_ghz"
-printf "${BLUE}%-28s${NC}${WHITE}%.2f%%${NC}\n" "Current CPU Utilization:" "$cpu_util"
+printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "Boost Supported:" "$boost_supported"
+printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "Boost Active:" "$boost_active"
 
 print_header "3. Cache Information"
 printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Data Cache:" "$(grep "L1d cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
 printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Instruction Cache:" "$(grep "L1i cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-
-print_header "4. CPU Boost Information"
-grep -E 'boost state support:|Supported:|Active:' "$CPU_INFO_FILE" | sed 's/.*: //'
