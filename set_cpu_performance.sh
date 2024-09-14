@@ -118,11 +118,13 @@ printf "schedutil %d\n" $schedutil_cores >> "$GOVERNOR_FILE"
 log_message "Core counts - Performance: $performance_cores, Powersave: $powersave_cores, Ondemand: $ondemand_cores, Conservative: $conservative_cores, Schedutil: $schedutil_cores"
 
 # Check boost status
-if cpupower frequency-info | grep -q "boost state support:.*Active: yes"; then
-    echo "Boost is already active" >> "$CPU_INFO_FILE"
+boost_status=$(cpupower frequency-info | grep -E 'boost state support:|Supported:|Active:')
+echo "$boost_status" >> "$CPU_INFO_FILE"
+
+# Log boost status
+if echo "$boost_status" | grep -q "Active: yes"; then
     log_message "AMD boost is active"
 else
-    echo "Boost is not active or not supported" >> "$CPU_INFO_FILE"
     log_message "AMD boost is not active or not supported"
 fi
 
@@ -173,3 +175,6 @@ printf "${BLUE}%-28s${NC}${WHITE}%.2f%%${NC}\n" "Current CPU Utilization:" "$cpu
 print_header "3. Cache Information"
 printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Data Cache:" "$(grep "L1d cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
 printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Instruction Cache:" "$(grep "L1i cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
+
+print_header "4. CPU Boost Information"
+grep -E 'boost state support:|Supported:|Active:' "$CPU_INFO_FILE" | sed 's/.*: //'
