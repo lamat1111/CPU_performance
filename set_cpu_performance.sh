@@ -161,4 +161,5 @@ printf "${BLUE}%-28s${NC}${WHITE}%.2f%%${NC}\n" "Current CPU Utilization:" "$(gr
 
 print_header "3. Cache Information"
 printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Data Cache:" "$(grep "L1d cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
-printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Instruction Cache:" "$(grep "L1i cache" "$CPU_INFO_FILE" | cut -d':' -
+printf "${BLUE}%-28s${NC}${WHITE}%s${NC}\n" "L1 Instruction Cache:" "$(grep "L1i cache" "$CPU_INFO_FILE" | cut -d':' -f2 | xargs)"
+
