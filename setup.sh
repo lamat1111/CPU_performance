@@ -22,6 +22,9 @@ if ! command_exists curl; then
     exit 1
 fi
 
+# Ensure the script directory exists
+mkdir -p /root/scripts
+
 # Check if the script already exists
 if [ -f "$SCRIPT_PATH" ]; then
     echo "Existing script found. Checking for updates..."
@@ -51,6 +54,13 @@ else
         echo "Failed to download the script. Please check your internet connection and try again."
         exit 1
     fi
+fi
+
+# Ensure cron is installed
+if ! command_exists crontab; then
+    echo "Error: cron is not installed. Installing cron..."
+    apt-get update
+    apt-get install -y cron
 fi
 
 # Check if cron jobs already exist
