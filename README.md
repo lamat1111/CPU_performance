@@ -1,6 +1,7 @@
 # CPU Performance Script for EPYC/Ryzen CPUs
 
 This repository contains scripts to optimize and monitor CPU performance for servers running AMD EPYC or Ryzen processors.
+The script is optimized for Ubuntu 24.04.
 
 ## Overview
 
@@ -17,7 +18,7 @@ The `set_cpu_performance.sh` script is designed to:
 To set up the script on your server, run the following command:
 
 ```bash
-curl -s https://raw.githubusercontent.com/mjessup/scripts/main/setup.sh | bash
+curl -s https://raw.githubusercontent.com/lamat1111/CPU_performance/main/setup.sh | bash
 ```
 
 This command will:
@@ -39,6 +40,7 @@ This command will:
 ## Requirements
 
 - AMD EPYC or Ryzen CPU
+- Ubuntu 24.04
 - Root access to the server
 - `curl` installed on the system
 
