@@ -7,7 +7,7 @@ NC='\033[0m' # No Color
 
 SCRIPT_NAME="set_cpu_performance.sh"
 SCRIPT_PATH="/root/scripts/$SCRIPT_NAME"
-GITHUB_RAW_URL="https://raw.githubusercontent.com/mjessup/scripts/main/$SCRIPT_NAME"
+GITHUB_RAW_URL="https://raw.githubusercontent.com/lamat1111/CPU_performance/main/$SCRIPT_NAME"
 
 echo -e "${YELLOW}Starting setup for CPU Performance Script...${NC}"
 
